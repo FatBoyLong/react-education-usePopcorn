@@ -296,6 +296,38 @@ function MovieDetails({ selectedId, onCLoseMovie, onAddWatched, watched }) {
     getMovieDetails();
   }, [selectedId]);
 
+  useEffect(
+    function () {
+      // guard statement
+      if (!title) return;
+
+      document.title = `Movie | ${title}`;
+
+      // clean-up function executes after component unmounts
+      // and before the effect is executed again
+      // and after rerender
+      return function () {
+        document.title = "usePopcorn";
+      };
+    },
+    [title]
+  );
+
+  useEffect(
+    function () {
+      function handleKeydown(e) {
+        if (e.code === "Escape") onCLoseMovie();
+      }
+
+      document.addEventListener("keydown", handleKeydown);
+
+      return function () {
+        document.removeEventListener("keydown", handleKeydown);
+      };
+    },
+    [onCLoseMovie]
+  );
+
   return (
     <div className="details">
       {isLoading ? (
@@ -382,6 +414,9 @@ function App() {
 
   useEffect(
     function () {
+      // browser API for control HTTP requests
+      const controller = new AbortController();
+
       async function fetchMovies() {
         try {
           // setIsLoading STATE for rendering loading component while fetching data
@@ -391,8 +426,10 @@ function App() {
           // So we always get an error (because initial value of error is "") and render <ErrorMessage /> in <Box />
           setError("");
 
+          // {signal: controller.signal} is usage of browser API for control HTTP requests AbortController
           const response = await fetch(
-            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
+            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+            { signal: controller.signal }
           );
 
           if (!response.ok) throw new Error("Something went wrong...");
@@ -402,9 +439,11 @@ function App() {
           if (data.Response === "False") throw new Error("Movie not found");
 
           setMovies(data.Search);
+          setError("");
           // setIsLoading(false);
         } catch (err) {
-          setError(err.message);
+          // checking for abort error
+          if (err.name !== "AbortError") setError(err.message);
         } finally {
           // use setIsLoading here cos after throwing error in try block code execution will be stopped.
           setIsLoading(false);
@@ -419,7 +458,14 @@ function App() {
         return;
       }
 
+      // for close MovieDetails after new search
+      handleCloseMovie()
+
       fetchMovies();
+
+      return function () {
+        controller.abort();
+      };
     },
     [query]
   );
