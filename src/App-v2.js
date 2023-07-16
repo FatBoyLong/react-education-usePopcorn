@@ -1,33 +1,57 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import StarRating from "./StarRating";
-import { useMovies } from "./useMovies";
+
+const tempMovieData = [
+  {
+    imdbID: "tt1375666",
+    Title: "Inception",
+    Year: "2010",
+    Poster:
+      "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
+  },
+  {
+    imdbID: "tt0133093",
+    Title: "The Matrix",
+    Year: "1999",
+    Poster:
+      "https://m.media-amazon.com/images/M/MV5BNzQzOTk3OTAtNDQ0Zi00ZTVkLWI0MTEtMDllZjNkYzNjNTc4L2ltYWdlXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SX300.jpg",
+  },
+  {
+    imdbID: "tt6751668",
+    Title: "Parasite",
+    Year: "2019",
+    Poster:
+      "https://m.media-amazon.com/images/M/MV5BYWZjMjk3ZTItODQ2ZC00NTY5LWE0ZDYtZTI3MjcwN2Q5NTVkXkEyXkFqcGdeQXVyODk4OTc3MTY@._V1_SX300.jpg",
+  },
+];
+
+const tempWatchedData = [
+  {
+    imdbID: "tt1375666",
+    Title: "Inception",
+    Year: "2010",
+    Poster:
+      "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
+    runtime: 148,
+    imdbRating: 8.8,
+    userRating: 10,
+  },
+  {
+    imdbID: "tt0088763",
+    Title: "Back to the Future",
+    Year: "1985",
+    Poster:
+      "https://m.media-amazon.com/images/M/MV5BZmU0M2Y1OGUtZjIxNi00ZjBkLTg1MjgtOWIyNThiZWIwYjRiXkEyXkFqcGdeQXVyMTQxNzMzNDI@._V1_SX300.jpg",
+    runtime: 116,
+    imdbRating: 8.5,
+    userRating: 9,
+  },
+];
 
 const average = (arr) =>
   arr.reduce((acc, cur, i, arr) => (acc + cur) / arr.length, 0);
 
 function Search({ query, setQuery }) {
-  // connecting to needed element with ref={inputEl}
-  const inputEl = useRef(null);
-  console.log(inputEl);
-
-  // manipulating DOM is sideEffect so we must use useEffect
-  useEffect(
-    function () {
-      function callback(e) {
-        if (document.activeElement === inputEl.current) return;
-
-        if (e.code === "Enter") {
-          inputEl.current.focus();
-          setQuery("");
-        }
-      }
-
-      document.addEventListener("keydown", callback);
-      return () => document.addEventListener("keydown", callback);
-    },
-    [setQuery]
-  );
-
   return (
     <input
       className="search"
@@ -35,7 +59,6 @@ function Search({ query, setQuery }) {
       placeholder="Search movies..."
       value={query}
       onChange={(e) => setQuery(e.target.value)}
-      ref={inputEl}
     />
   );
 }
@@ -219,15 +242,6 @@ function MovieDetails({ selectedId, onCLoseMovie, onAddWatched, watched }) {
   const [isLoading, setIsLoading] = useState(false);
   const [userRating, setUserRating] = useState("");
 
-  const countRef = useRef(0);
-
-  useEffect(
-    function () {
-      if (userRating) countRef.current++;
-    },
-    [userRating]
-  );
-
   // checking if selected movie is already in watched array
   const isWatched = watched.map((movie) => movie.imdbID).includes(selectedId);
 
@@ -259,7 +273,6 @@ function MovieDetails({ selectedId, onCLoseMovie, onAddWatched, watched }) {
       imdbRating: Number(imdbRating),
       runtime: Number(runtime.split(" ").at(0)),
       userRating,
-      countRatingDecisions: countRef.current,
     };
 
     onAddWatched(newWatchedMovie);
@@ -375,20 +388,12 @@ function MovieDetails({ selectedId, onCLoseMovie, onAddWatched, watched }) {
 const KEY = "f9fb5bfd";
 
 function App() {
+  const [movies, setMovies] = useState([]);
+  const [watched, setWatched] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(null);
-
-  // using custom hook
-  const { movies, error, isLoading } = useMovies(query);
-
-  // commented out after loading watched data from local storage
-  // const [watched, setWatched] = useState([]);
-
-  // we can pass into useState PURE callback function, that returns value. NO ARGUMENTS REQUIRES IN CALLBACK.
-  const [watched, setWatched] = useState(function () {
-    const storedValue = localStorage.getItem("watched");
-    return JSON.parse(storedValue);
-  });
 
   function handleSelectMovie(id) {
     // checking for selectedId for toggling <MovieDetails />
@@ -407,13 +412,62 @@ function App() {
     setWatched((watched) => watched.filter((movie) => movie.imdbID !== id));
   }
 
-  // updates when watched changes
   useEffect(
     function () {
-      // setting data (movie) in local storage. localStorage.setItem(key name, value)
-      localStorage.setItem("watched", JSON.stringify(watched));
+      // browser API for control HTTP requests
+      const controller = new AbortController();
+
+      async function fetchMovies() {
+        try {
+          // setIsLoading STATE for rendering loading component while fetching data
+          setIsLoading(true);
+
+          // setError STATE setter for reload error state. We only set error in catch block and never reset it
+          // So we always get an error (because initial value of error is "") and render <ErrorMessage /> in <Box />
+          setError("");
+
+          // {signal: controller.signal} is usage of browser API for control HTTP requests AbortController
+          const response = await fetch(
+            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+            { signal: controller.signal }
+          );
+
+          if (!response.ok) throw new Error("Something went wrong...");
+
+          const data = await response.json();
+
+          if (data.Response === "False") throw new Error("Movie not found");
+
+          setMovies(data.Search);
+          setError("");
+          // setIsLoading(false);
+        } catch (err) {
+          // checking for abort error
+          if (err.name !== "AbortError") setError(err.message);
+        } finally {
+          // use setIsLoading here cos after throwing error in try block code execution will be stopped.
+          setIsLoading(false);
+        }
+      }
+
+      // guard statement
+      // start execution of fetchMovies() only if query length ib greater than 3
+      if (query.length < 3) {
+        setMovies([]);
+        setError("");
+        return;
+      }
+
+      // for close MovieDetails after new search
+      handleCloseMovie()
+
+      fetchMovies();
+
+      return function () {
+        controller.abort();
+      };
     },
-    [watched]
+    [query]
   );
 
   return (
