@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import StarRating from "./StarRating";
+import { useKey } from "./useKey";
 import { useLocalStorageState } from "./useLocalStorageState";
 import { useMovies } from "./useMovies";
 
@@ -11,23 +12,23 @@ function Search({ query, setQuery }) {
   const inputEl = useRef(null);
   console.log(inputEl);
 
-  // manipulating DOM is sideEffect so we must use useEffect
-  useEffect(
-    function () {
-      function callback(e) {
-        if (document.activeElement === inputEl.current) return;
+  useKey("Enter", function (e) {
+    if (document.activeElement === inputEl.current) return;
+    inputEl.current.focus();
+    setQuery("");
+  });
 
-        if (e.code === "Enter") {
-          inputEl.current.focus();
-          setQuery("");
-        }
-      }
+  // commented out after using custom hook useKey
+  // // manipulating DOM is sideEffect so we must use useEffect
+  // useEffect(
+  //   function () {
+  //     function callback(e) {}
 
-      document.addEventListener("keydown", callback);
-      return () => document.addEventListener("keydown", callback);
-    },
-    [setQuery]
-  );
+  //     document.addEventListener("keydown", callback);
+  //     return () => document.addEventListener("keydown", callback);
+  //   },
+  //   [setQuery]
+  // );
 
   return (
     <input
@@ -301,20 +302,24 @@ function MovieDetails({ selectedId, onCLoseMovie, onAddWatched, watched }) {
     [title]
   );
 
-  useEffect(
-    function () {
-      function handleKeydown(e) {
-        if (e.code === "Escape") onCLoseMovie();
-      }
+  // using custom hook
+  useKey("Escape", onCLoseMovie);
 
-      document.addEventListener("keydown", handleKeydown);
+  // commented after using custom hook useKey
+  // useEffect(
+  //   function () {
+  //     function handleKeydown(e) {
+  //       if (e.code === "Escape") onCLoseMovie();
+  //     }
 
-      return function () {
-        document.removeEventListener("keydown", handleKeydown);
-      };
-    },
-    [onCLoseMovie]
-  );
+  //     document.addEventListener("keydown", handleKeydown);
+
+  //     return function () {
+  //       document.removeEventListener("keydown", handleKeydown);
+  //     };
+  //   },
+  //   [onCLoseMovie]
+  // );
 
   return (
     <div className="details">
@@ -386,7 +391,7 @@ function App() {
   // const [watched, setWatched] = useState([]);
 
   // using custom hook
-  const [watched, setWatched] = useLocalStorageState([], 'watched');
+  const [watched, setWatched] = useLocalStorageState([], "watched");
 
   // // we can pass into useState PURE callback function, that returns value. NO ARGUMENTS REQUIRES IN CALLBACK.
   // const [watched, setWatched] = useState(function () {
