@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import StarRating from "./StarRating";
+import { useLocalStorageState } from "./useLocalStorageState";
 import { useMovies } from "./useMovies";
 
 const average = (arr) =>
@@ -384,11 +385,14 @@ function App() {
   // commented out after loading watched data from local storage
   // const [watched, setWatched] = useState([]);
 
-  // we can pass into useState PURE callback function, that returns value. NO ARGUMENTS REQUIRES IN CALLBACK.
-  const [watched, setWatched] = useState(function () {
-    const storedValue = localStorage.getItem("watched");
-    return JSON.parse(storedValue);
-  });
+  // using custom hook
+  const [watched, setWatched] = useLocalStorageState([], 'watched');
+
+  // // we can pass into useState PURE callback function, that returns value. NO ARGUMENTS REQUIRES IN CALLBACK.
+  // const [watched, setWatched] = useState(function () {
+  //   const storedValue = localStorage.getItem("watched");
+  //   return JSON.parse(storedValue);
+  // });
 
   function handleSelectMovie(id) {
     // checking for selectedId for toggling <MovieDetails />
@@ -407,14 +411,14 @@ function App() {
     setWatched((watched) => watched.filter((movie) => movie.imdbID !== id));
   }
 
-  // updates when watched changes
-  useEffect(
-    function () {
-      // setting data (movie) in local storage. localStorage.setItem(key name, value)
-      localStorage.setItem("watched", JSON.stringify(watched));
-    },
-    [watched]
-  );
+  // // updates when watched changes
+  // useEffect(
+  //   function () {
+  //     // setting data (movie) in local storage. localStorage.setItem(key name, value)
+  //     localStorage.setItem("watched", JSON.stringify(watched));
+  //   },
+  //   [watched]
+  // );
 
   return (
     <>
